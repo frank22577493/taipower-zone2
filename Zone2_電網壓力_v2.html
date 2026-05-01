@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>電網壓力 — ZONE 2 · 電智流 2026</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+:root {
+  --bg:#060b18; --panel:#0d1628; --panel2:#111e35;
+  --border:#1a3050; --blue:#00e5ff; --green:#00ff88;
+  --amber:#ff9500; --red:#ff2244; --dim:#4a6080; --text:#c8dff0;
+}
+body {
+  background:var(--bg); color:var(--text);
+  font-family:'Microsoft JhengHei','PingFang TC',sans-serif;
+  min-height:100vh; overflow-x:hidden;
+}
+body::after {
+  content:''; position:fixed; inset:0;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.03) 2px,rgba(0,0,0,0.03) 4px);
+  pointer-events:none; z-index:999;
+}
+
+/* ── Screens ── */
+.screen { display:none; min-height:100vh; }
+.screen.active { display:flex; }
+
+/* ── INTRO ── */
+#s-intro {
+  flex-direction:column; align-items:center; justify-content:center;
+  gap:0; padding:40px 20px; text-align:center;
+}
+.intro-zone { font-size:12px; letter-spacing:6px; color:var(--dim); margin-bottom:20px; }
+.intro-title {
+  font-size:clamp(56px,10vw,100px); font-weight:900; color:var(--amber);
+  line-height:1; letter-spacing:-2px;
+  text-shadow:0 0 60px rgba(255,149,0,0.4); margin-bottom:8px;
+}
+.intro-en { font-size:clamp(13px,2vw,18px); color:var(--blue); letter-spacing:6px; margin-bottom:36px; }
+.intro-body { max-width:540px; font-size:16px; line-height:2; color:var(--text); margin-bottom:44px; }
+.intro-body strong { color:var(--amber); }
+.btn-main {
+  background:transparent; border:2px solid var(--amber); color:var(--amber);
+  font-size:16px; letter-spacing:4px; padding:15px 64px;
+  cursor:pointer; font-family:inherit; transition:all 0.2s;
+}
+.btn-main:hover { background:var(--amber); color:#000; box-shadow:0 0 30px rgba(255,149,0,0.5); }
+
+/* ── COUNTDOWN ── */
+#s-countdown {
+  flex-direction:column; align-items:center; justify-content:center;
+  gap:16px; background:var(--bg);
+}
+.cd-label { font-size:13px; letter-spacing:5px; color:var(--dim); }
+.cd-num {
+  font-size:clamp(140px,28vw,240px); font-weight:900; line-height:1;
+  color:var(--red); text-shadow:0 0 80px rgba(255,34,68,0.5);
+  animation:cdpop 0.9s ease;
+}
+.cd-num.go { color:var(--green); text-shadow:0 0 80px rgba(0,255,136,0.5); font-size:clamp(80px,16vw,140px); letter-spacing:8px; }
+@keyframes cdpop { 0%{transform:scale(1.4);opacity:0} 30%{opacity:1} 100%{transform:scale(1);opacity:1} }
+
+/* ── GAME ── */
+#s-game { flex-direction:column; padding:16px; gap:12px; min-height:100vh; }
+
+.top-bar {
+  display:flex; align-items:center; gap:16px;
+  background:var(--panel); border:1px solid var(--border);
+  border-radius:4px; padding:10px 20px; flex-shrink:0;
+}
+.zone-tag { font-size:11px; letter-spacing:4px; color:var(--dim); white-space:nowrap; }
+.balance-wrap { flex:1; display:flex; flex-direction:column; gap:6px; }
+.balance-labels { display:flex; justify-content:space-between; font-size:11px; color:var(--dim); }
+.balance-track {
+  height:12px; background:#080d18; border-radius:6px;
+  overflow:hidden; border:1px solid var(--border); position:relative;
+}
+.balance-supply { height:100%; border-radius:6px; background:var(--blue); transition:width 0.5s ease, background 0.4s; }
+.balance-pct {
+  font-size:22px; font-weight:bold; color:var(--dim);
+  white-space:nowrap; min-width:64px; text-align:right; transition:color 0.4s;
+}
+.timer-wrap { text-align:right; flex-shrink:0; }
+.timer-label { font-size:10px; letter-spacing:3px; color:var(--dim); }
+.timer-val { font-size:40px; font-weight:bold; color:var(--blue); line-height:1; font-variant-numeric:tabular-nums; }
+.timer-val.urgent { color:var(--red); animation:blink 0.5s infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.35} }
+
+.game-grid {
+  display:grid; grid-template-columns:1fr 190px 1fr;
+  gap:12px; flex:1; min-height:0;
+}
+
+/* Source cards */
+.sources-panel { display:flex; flex-direction:column; gap:8px; }
+.panel-label { font-size:10px; letter-spacing:4px; color:var(--dim); margin-bottom:2px; }
+.cards-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; flex:1; }
+
+.src-card {
+  background:var(--panel); border:1px solid var(--border);
+  border-radius:6px; cursor:pointer; transition:all 0.2s;
+  display:flex; flex-direction:column; overflow:hidden;
+  position:relative; user-select:none;
+}
+.src-card:hover:not(.selected):not(.disabled) { border-color:#2e5080; transform:translateY(-2px); box-shadow:0 4px 16px rgba(0,0,0,0.3); }
+.src-card.selected { border-color:var(--blue); background:#0f2035; box-shadow:0 0 20px rgba(0,229,255,0.15); }
+.src-card.selected::after {
+  content:'✓'; position:absolute; top:6px; right:8px;
+  font-size:14px; font-weight:bold; color:var(--blue); z-index:2;
+}
+.src-card.disabled { opacity:0.3; cursor:not-allowed; transform:none !important; }
+.src-card.mystery { border-color:#222; background:#080808; }
+.src-card.mystery:hover:not(.selected):not(.disabled) { border-color:#444; box-shadow:0 4px 16px rgba(0,0,0,0.5); }
+.src-card.mystery.selected { border-color:var(--amber); background:#100800; box-shadow:0 0 24px rgba(255,149,0,0.25); }
+.src-card.mystery.selected::after { color:var(--amber); }
+
+.card-img-box {
+  width:100%; height:82px; display:flex; align-items:center;
+  justify-content:center; font-size:40px; flex-shrink:0;
+  position:relative; overflow:hidden;
+}
+.card-img-box img { width:100%; height:100%; object-fit:cover; position:absolute; inset:0; }
+.card-img-box .card-emoji { position:relative; z-index:1; font-size:40px; }
+
+.card-info { padding:8px 10px 10px; }
+.card-name { font-size:13px; font-weight:bold; color:var(--text); margin-bottom:2px; }
+.card-mw { font-size:11px; color:var(--blue); margin-bottom:3px; }
+.card-tag { font-size:10px; padding:2px 6px; border-radius:10px; display:inline-block; }
+.tag-stable   { background:rgba(0,255,136,0.1); color:var(--green); }
+.tag-unstable { background:rgba(255,149,0,0.1); color:var(--amber); }
+.tag-mystery  { background:rgba(255,255,255,0.04); color:#444; }
+
+/* Slots */
+.slots-panel {
+  display:flex; flex-direction:column; align-items:center;
+  justify-content:center; gap:10px;
+}
+.slots-title { font-size:10px; letter-spacing:3px; color:var(--dim); text-align:center; }
+.slot {
+  width:164px; height:90px; border:2px dashed var(--border);
+  border-radius:8px; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:4px;
+  transition:all 0.3s; position:relative; overflow:hidden;
+}
+.slot.filled { border-style:solid; border-color:var(--blue); background:rgba(0,229,255,0.04); }
+.slot.filled-mystery { border-style:solid; border-color:var(--amber); background:rgba(255,149,0,0.04); }
+.slot-placeholder { font-size:12px; color:var(--dim); letter-spacing:1px; }
+.slot-icon { font-size:26px; }
+.slot-name { font-size:12px; font-weight:bold; color:var(--text); }
+.slot-mw { font-size:11px; color:var(--blue); }
+.slot-mw.mys { color:var(--amber); }
+
+.conn-line {
+  width:2px; height:16px; background:var(--border); transition:all 0.3s;
+}
+.conn-line.on-blue { background:var(--blue); box-shadow:0 0 6px rgba(0,229,255,0.6); }
+.conn-line.on-amber { background:var(--amber); box-shadow:0 0 6px rgba(255,149,0,0.6); }
+
+.btn-confirm {
+  background:var(--amber); color:#000; border:none;
+  border-radius:4px; padding:12px 0; font-size:14px;
+  font-weight:bold; cursor:pointer; font-family:inherit;
+  letter-spacing:1px; width:164px; margin-top:4px;
+  opacity:0.35; pointer-events:none; transition:opacity 0.2s, box-shadow 0.2s;
+}
+.btn-confirm.ready {
+  opacity:1; pointer-events:auto;
+  animation:pulseAmber 1.8s infinite;
+}
+.btn-confirm.ready:hover { background:#ffcc00; transform:translateY(-1px); }
+@keyframes pulseAmber {
+  0%,100%{box-shadow:0 0 0 0 rgba(255,149,0,0.45)}
+  60%{box-shadow:0 0 0 10px rgba(255,149,0,0)}
+}
+
+/* Demand panel */
+.demand-panel { display:flex; flex-direction:column; gap:8px; }
+.demand-row {
+  background:var(--panel); border:1px solid var(--border);
+  border-radius:6px; padding:12px 14px;
+  display:flex; align-items:center; gap:12px;
+  flex:1; transition:border-color 0.3s;
+}
+.demand-row.warn { border-color:var(--amber); }
+.demand-row.crit { border-color:var(--red); animation:pulseDanger 1.2s infinite; }
+@keyframes pulseDanger {
+  0%,100%{box-shadow:0 0 0 0 rgba(255,34,68,0.15)}
+  50%{box-shadow:0 0 0 4px rgba(255,34,68,0.08)}
+}
+.demand-icon { font-size:28px; flex-shrink:0; }
+.demand-info { flex:1; min-width:0; }
+.demand-name { font-size:14px; font-weight:bold; color:var(--text); margin-bottom:4px; }
+.demand-bar-bg { height:5px; background:#080d18; border-radius:3px; overflow:hidden; margin-bottom:4px; }
+.demand-bar { height:100%; background:var(--red); border-radius:3px; transition:width 0.9s ease; }
+.demand-desc { font-size:10px; color:var(--dim); letter-spacing:1px; }
+.demand-right { text-align:right; flex-shrink:0; }
+.demand-mw { font-size:26px; font-weight:bold; color:var(--red); font-variant-numeric:tabular-nums; }
+.demand-unit { font-size:10px; color:var(--dim); }
+.demand-rising { font-size:10px; color:var(--red); animation:blink 1.2s infinite; }
+
+/* ── RESULT FAIL ── */
+#s-result-fail {
+  flex-direction:column; align-items:center; justify-content:center;
+  gap:22px; padding:40px 20px; text-align:center; background:#000;
+}
+.res-zone { font-size:11px; letter-spacing:5px; color:var(--red); }
+.res-title { font-size:clamp(38px,7vw,76px); font-weight:900; color:var(--red); line-height:1.1; text-shadow:0 0 40px rgba(255,34,68,0.5); }
+.res-pct-row { display:flex; align-items:baseline; gap:8px; }
+.res-pct { font-size:clamp(48px,9vw,80px); font-weight:900; color:var(--amber); }
+.res-pct-label { font-size:16px; color:var(--dim); }
+.res-body { font-size:15px; color:#777; line-height:1.9; max-width:480px; }
+.res-body strong { color:var(--text); }
+.res-divider { width:48px; height:1px; background:var(--red); }
+.res-hint {
+  background:rgba(255,149,0,0.06); border:1px solid rgba(255,149,0,0.25);
+  border-radius:6px; padding:18px 28px; max-width:420px; width:100%;
+}
+.res-hint-label { font-size:10px; color:var(--dim); letter-spacing:4px; margin-bottom:8px; }
+.res-hint-text { font-size:16px; color:var(--amber); font-weight:bold; line-height:1.6; }
+.btn-outline {
+  background:transparent; border:2px solid var(--amber); color:var(--amber);
+  font-size:14px; letter-spacing:3px; padding:13px 44px;
+  cursor:pointer; font-family:inherit; transition:all 0.2s;
+}
+.btn-outline:hover { background:var(--amber); color:#000; }
+.btn-ghost {
+  background:transparent; border:1px solid var(--dim); color:var(--dim);
+  font-size:12px; letter-spacing:2px; padding:10px 28px;
+  cursor:pointer; font-family:inherit; transition:all 0.2s;
+}
+.btn-ghost:hover { border-color:var(--text); color:var(--text); }
+
+/* ── RESULT MYSTERY ── */
+#s-result-mystery {
+  flex-direction:column; align-items:center; justify-content:center;
+  gap:20px; padding:40px 20px; text-align:center; background:#000;
+}
+.mys-flash-el {
+  position:fixed; inset:0; background:var(--green);
+  opacity:0; pointer-events:none; z-index:600;
+}
+.mys-flash-el.pop { animation:flashpop 0.7s ease forwards; }
+@keyframes flashpop { 0%{opacity:0.5} 100%{opacity:0} }
+.mys-tag { font-size:11px; letter-spacing:5px; color:var(--green); opacity:0; animation:slideUp 0.5s 0.2s forwards; }
+.mys-title { font-size:clamp(34px,6vw,62px); font-weight:900; color:var(--green); text-shadow:0 0 40px rgba(0,255,136,0.5); opacity:0; animation:slideUp 0.6s 0.5s forwards; }
+.mys-bar-wrap { opacity:0; animation:slideUp 0.5s 0.9s forwards; }
+.mys-bar-track { width:240px; height:14px; background:#080d18; border-radius:7px; border:1px solid var(--border); overflow:hidden; }
+.mys-bar-fill { height:100%; width:0; border-radius:7px; background:linear-gradient(90deg,var(--green),var(--blue)); animation:fillMysBar 1.6s 1.1s ease forwards; }
+@keyframes fillMysBar { to{width:100%} }
+.mys-pct { font-size:56px; font-weight:900; color:var(--green); opacity:0; animation:slideUp 0.5s 1.5s forwards; }
+.mys-divider { width:48px; height:1px; background:var(--green); opacity:0; animation:slideUp 0.4s 1.9s forwards; }
+.mys-body { font-size:15px; color:#777; line-height:1.9; max-width:480px; opacity:0; animation:slideUp 0.6s 2.1s forwards; }
+.mys-body strong { color:var(--text); }
+.mys-teaser {
+  background:rgba(0,229,255,0.04); border:1px solid rgba(0,229,255,0.2);
+  border-radius:6px; padding:20px 30px; max-width:440px; width:100%;
+  opacity:0; animation:slideUp 0.6s 2.7s forwards;
+}
+.mys-teaser-label { font-size:10px; color:var(--dim); letter-spacing:4px; margin-bottom:10px; }
+.mys-teaser-text { font-size:18px; color:var(--blue); font-weight:bold; line-height:1.6; }
+.mys-btns { opacity:0; animation:slideUp 0.5s 3.2s forwards; display:flex; gap:12px; }
+@keyframes slideUp { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+
+@keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-7px)} 40%{transform:translateX(7px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} }
+.shake { animation:shake 0.35s ease; }
+</style>
+</head>
+<body>
+
+<div id="mys-flash" class="mys-flash-el"></div>
+
+<!-- ══ INTRO ══ -->
+<div id="s-intro" class="screen active">
+  <div class="intro-zone">ZONE 2 · 電智流 2026</div>
+  <div class="intro-title">電網壓力</div>
+  <div class="intro-en">GRID TENSION</div>
+  <div class="intro-body">
+    AI機房、半導體廠、工業區——<br>
+    用電需求同時暴增，傳統電源已到極限。<br><br>
+    你是今天的<strong>電力調度員</strong>。<br>
+    從六種電源選兩種，插入電網，<br>
+    看能否讓台灣撐過這一波需求衝擊。
+  </div>
+  <button class="btn-main" onclick="startCountdown()">▶ 開始調度</button>
+</div>
+
+<!-- ══ COUNTDOWN ══ -->
+<div id="s-countdown" class="screen">
+  <div class="cd-label">準備調度</div>
+  <div class="cd-num" id="cd-num">3</div>
+</div>
+
+<!-- ══ GAME ══ -->
+<div id="s-game" class="screen">
+
+  <!-- Top bar -->
+  <div class="top-bar">
+    <div class="zone-tag">ZONE 2 · 電網壓力</div>
+    <div class="balance-wrap">
+      <div class="balance-labels">
+        <span>已接入電源</span>
+        <span id="bal-status" style="color:var(--dim)">請選擇電源</span>
+        <span>即時需求</span>
+      </div>
+      <div class="balance-track">
+        <div class="balance-supply" id="bal-bar" style="width:0%"></div>
+      </div>
+    </div>
+    <div class="balance-pct" id="bal-pct">—</div>
+    <div class="timer-wrap">
+      <div class="timer-label">剩餘時間</div>
+      <div class="timer-val" id="timer">60</div>
+    </div>
+  </div>
+
+  <!-- Main grid -->
+  <div class="game-grid">
+
+    <!-- LEFT: Sources -->
+    <div class="sources-panel">
+      <div class="panel-label">電源選項 — 點選最多 2 種</div>
+      <div class="cards-grid" id="cards-grid"></div>
+    </div>
+
+    <!-- CENTER: Slots + Confirm -->
+    <div class="slots-panel">
+      <div class="slots-title">已接入電網</div>
+      <div class="slot" id="slot-0">
+        <div style="font-size:20px;color:var(--dim)">⚡</div>
+        <div class="slot-placeholder">插槽 1</div>
+      </div>
+      <div class="conn-line" id="conn-0"></div>
+      <div class="slot" id="slot-1">
+        <div style="font-size:20px;color:var(--dim)">⚡</div>
+        <div class="slot-placeholder">插槽 2</div>
+      </div>
+      <button class="btn-confirm" id="btn-confirm" onclick="confirmSelection()">
+        ⚡ 確認接入
+      </button>
+    </div>
+
+    <!-- RIGHT: Demand -->
+    <div class="demand-panel" id="demand-panel">
+      <div class="panel-label">即時用電需求</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══ RESULT: FAIL ══ -->
+<div id="s-result-fail" class="screen">
+  <div class="res-zone" id="fail-tag">供電不足</div>
+  <div class="res-title" id="fail-title">電網超載</div>
+  <div class="res-pct-row">
+    <div class="res-pct" id="fail-pct">72</div>
+    <div class="res-pct-label">% 覆蓋率</div>
+  </div>
+  <div class="res-body" id="fail-body">
+    傳統電源組合最多只能滿足需求的 <strong id="fail-pct2">72%</strong>。<br>
+    這不是調度失誤——是既有電源的上限。
+  </div>
+  <div class="res-divider"></div>
+  <div class="res-hint">
+    <div class="res-hint-label">你有沒有注意到</div>
+    <div class="res-hint-text">有一張黑色卡片，你沒有選…<br>如果選了它，結果會不同。</div>
+  </div>
+  <button class="btn-outline" onclick="location.reload()">↺ 再試一次</button>
+</div>
+
+<!-- ══ RESULT: MYSTERY ══ -->
+<div id="s-result-mystery" class="screen">
+  <div class="mys-tag">ZONE 2 完成 · 電網穩定</div>
+  <div class="mys-title">供需完美平衡</div>
+  <div class="mys-bar-wrap">
+    <div class="mys-bar-track"><div class="mys-bar-fill"></div></div>
+  </div>
+  <div class="mys-pct">100%</div>
+  <div class="mys-divider"></div>
+  <div class="mys-body">
+    你選擇了那張神秘卡片。<br>
+    它在瞬間整合了全台分散的電力資源，<br>
+    精準補上每一個缺口，電網完美穩住。<br><br>
+    <strong>但它究竟是什麼？</strong><br>
+    傳統的電廠裡找不到它。
+  </div>
+  <div class="mys-teaser">
+    <div class="mys-teaser-label">答案就在前方</div>
+    <div class="mys-teaser-text">
+      前往 ZONE 3 智變<br>
+      揭開台電的隱藏武器 →
+    </div>
+  </div>
+  <div class="mys-btns">
+    <button class="btn-ghost" onclick="location.reload()">↺ 再玩一次</button>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════
+//  AUDIO ENGINE
+// ══════════════════════════════
+let AC = null;
+function ac() {
+  if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)();
+  return AC;
+}
+function tone(freq, dur, type='sine', vol=0.18, delay=0) {
+  try {
+    const c=ac(), t=c.currentTime+delay;
+    const o=c.createOscillator(), g=c.createGain();
+    o.connect(g); g.connect(c.destination);
+    o.type=type; o.frequency.setValueAtTime(freq,t);
+    g.gain.setValueAtTime(vol,t);
+    g.gain.exponentialRampToValueAtTime(0.001,t+dur);
+    o.start(t); o.stop(t+dur);
+  } catch(e){}
+}
+
+// Click UI
+function sndClick() { tone(900, 0.05, 'sine', 0.1); }
+
+// Plug in card
+function sndPlug() {
+  tone(220,0.05,'sawtooth',0.15,0);
+  tone(440,0.06,'sine',0.18,0.05);
+  tone(880,0.1,'sine',0.15,0.1);
+}
+
+// Unplug
+function sndUnplug() {
+  tone(880,0.04,'sine',0.12,0);
+  tone(440,0.05,'sine',0.12,0.04);
+  tone(220,0.08,'sawtooth',0.1,0.08);
+}
+
+// Mystery card selected
+function sndMystery() {
+  [180,270,360,540,810,1080].forEach((f,i)=>{
+    tone(f, 0.3, 'triangle', 0.12, i*0.08);
+  });
+}
+
+// Warning beep
+function sndWarn() {
+  tone(880,0.1,'square',0.08,0);
+  tone(660,0.1,'square',0.08,0.15);
+}
+
+// Countdown beep
+function sndCountdownBeep(high) { tone(high?1200:800, 0.28, 'sine', 0.28); }
+
+// Demand rising tick
+function sndRisingTick() { tone(400,0.05,'sine',0.05); }
+
+// Fail sound
+function sndFail() {
+  const c=ac(), t=c.currentTime;
+  const o=c.createOscillator(), g=c.createGain();
+  o.connect(g); g.connect(c.destination);
+  o.type='sawtooth';
+  o.frequency.setValueAtTime(440,t);
+  o.frequency.exponentialRampToValueAtTime(55,t+1.8);
+  g.gain.setValueAtTime(0.35,t);
+  g.gain.exponentialRampToValueAtTime(0.001,t+2);
+  o.start(t); o.stop(t+2);
+}
+
+// Success fanfare
+function sndSuccess() {
+  [523,659,784,1047,1319].forEach((f,i)=>{ tone(f,0.5,'sine',0.22,i*0.12); });
+}
+
+// Ambient hum
+let ambOsc=null, ambGain=null;
+function startAmbient() {
+  try {
+    const c=ac();
+    ambOsc=c.createOscillator(); ambGain=c.createGain();
+    const lfo=c.createOscillator(), lg=c.createGain();
+    lfo.frequency.setValueAtTime(0.4,c.currentTime);
+    lg.gain.setValueAtTime(0.008,c.currentTime);
+    lfo.connect(lg); lg.connect(ambGain.gain);
+    ambOsc.type='sine'; ambOsc.frequency.setValueAtTime(55,c.currentTime);
+    ambGain.gain.setValueAtTime(0.05,c.currentTime);
+    ambOsc.connect(ambGain); ambGain.connect(c.destination);
+    lfo.start(); ambOsc.start();
+  } catch(e){}
+}
+function stopAmbient() { try{ ambOsc&&ambOsc.stop(); }catch(e){} }
+
+// ══════════════════════════════
+//  GAME DATA
+// ══════════════════════════════
+const SOURCES = [
+  { id:'coal',    emoji:'🏭', name:'燃煤發電',  mw:450, tag:'穩定供應',   tc:'stable',   bg:'#160e08' },
+  { id:'gas',     emoji:'🔥', name:'天然氣',    mw:380, tag:'快速啟動',   tc:'stable',   bg:'#160f08' },
+  { id:'solar',   emoji:'☀️', name:'太陽能',   mw:210, tag:'天氣依賴',   tc:'unstable', bg:'#141608' },
+  { id:'wind',    emoji:'💨', name:'風力發電',  mw:265, tag:'風速依賴',   tc:'unstable', bg:'#08101a' },
+  { id:'hydro',   emoji:'💧', name:'水力發電',  mw:315, tag:'地形限制',   tc:'stable',   bg:'#081318' },
+  { id:'mystery', emoji:'？', name:'???',       mw:0,   tag:'???',        tc:'mystery',  bg:'#080808', isMystery:true },
+];
+
+const DEMANDS = [
+  { id:'aidc', emoji:'🤖', name:'AI 資料中心', base:300, growth:2.2, desc:'算力需求持續爆增' },
+  { id:'semi', emoji:'🏗', name:'半導體廠區',  base:250, growth:1.6, desc:'全線滿載生產中' },
+  { id:'ind',  emoji:'⚙️', name:'工業重區',   base:180, growth:1.0, desc:'三班制全速運轉' },
+  { id:'city', emoji:'🏙', name:'商業住宅',   base:120, growth:0.7, desc:'夏日尖峰用電' },
+];
+
+// ══════════════════════════════
+//  STATE
+// ══════════════════════════════
+let selected = [];       // up to 2 source IDs
+let timeLeft = 60;
+let demandNow = {};      // current MW per demand sector
+let gameActive = false;
+let gameInterval = null;
+
+function totalDemand() {
+  return DEMANDS.reduce((s,d)=>s+demandNow[d.id],0);
+}
+function totalSupply() {
+  return selected.reduce((s,id)=>{
+    const src=SOURCES.find(x=>x.id===id);
+    return s+(src?src.mw:0);
+  },0);
+}
+function hasMystery() { return selected.includes('mystery'); }
+
+// ══════════════════════════════
+//  BUILD UI
+// ══════════════════════════════
+function buildCards() {
+  const grid = document.getElementById('cards-grid');
+  grid.innerHTML = '';
+  SOURCES.forEach(src => {
+    const card = document.createElement('div');
+    card.className = 'src-card' + (src.isMystery?' mystery':'');
+    card.id = 'card-'+src.id;
+    card.onclick = ()=>toggleCard(src.id);
+    if (src.isMystery) {
+      card.innerHTML = `
+        <div class="card-img-box" style="background:#060606;height:82px">
+          <span class="card-emoji" style="font-size:44px;color:#2a2a2a">？</span>
+        </div>
+        <div class="card-info">
+          <div class="card-name" style="color:#333">???</div>
+          <div class="card-mw" style="color:#333">— MW</div>
+          <span class="card-tag tag-mystery">神秘來源</span>
+        </div>`;
+    } else {
+      card.innerHTML = `
+        <div class="card-img-box" style="background:${src.bg}">
+          <span class="card-emoji">${src.emoji}</span>
+        </div>
+        <div class="card-info">
+          <div class="card-name">${src.name}</div>
+          <div class="card-mw">+${src.mw} MW</div>
+          <span class="card-tag tag-${src.tc}">${src.tag}</span>
+        </div>`;
+    }
+    grid.appendChild(card);
+  });
+}
+
+function buildDemand() {
+  const panel = document.getElementById('demand-panel');
+  // keep label, clear rows
+  while(panel.children.length > 1) panel.removeChild(panel.lastChild);
+  DEMANDS.forEach(d => {
+    demandNow[d.id] = d.base;
+    const row = document.createElement('div');
+    row.className = 'demand-row'; row.id = 'drow-'+d.id;
+    row.innerHTML = `
+      <div class="demand-icon">${d.emoji}</div>
+      <div class="demand-info">
+        <div class="demand-name">${d.name}</div>
+        <div class="demand-bar-bg"><div class="demand-bar" id="dbar-${d.id}" style="width:55%"></div></div>
+        <div class="demand-desc">${d.desc}</div>
+      </div>
+      <div class="demand-right">
+        <div class="demand-mw" id="dmw-${d.id}">${d.base}</div>
+        <div class="demand-unit">MW</div>
+        <div class="demand-rising">▲ 上升中</div>
+      </div>`;
+    panel.appendChild(row);
+  });
+}
+
+// ══════════════════════════════
+//  INTERACTION
+// ══════════════════════════════
+function toggleCard(id) {
+  if (!gameActive) return;
+  const idx = selected.indexOf(id);
+  if (idx >= 0) {
+    // Deselect
+    sndUnplug();
+    selected.splice(idx,1);
+    document.getElementById('card-'+id).classList.remove('selected');
+  } else {
+    if (selected.length >= 2) {
+      sndWarn();
+      const grid = document.getElementById('cards-grid');
+      grid.classList.remove('shake'); void grid.offsetWidth; grid.classList.add('shake');
+      return;
+    }
+    selected.push(id);
+    document.getElementById('card-'+id).classList.add('selected');
+    if (id==='mystery') sndMystery(); else sndPlug();
+  }
+  updateSlots();
+  updateBalance();
+  updateConfirmBtn();
+}
+
+function updateSlots() {
+  for (let i=0; i<2; i++) {
+    const slot=document.getElementById('slot-'+i);
+    const conn=document.getElementById('conn-'+i);
+    const src = selected[i] ? SOURCES.find(x=>x.id===selected[i]) : null;
+    if (src) {
+      const m=src.isMystery;
+      slot.className='slot '+(m?'filled-mystery':'filled');
+      if (conn) conn.className='conn-line '+(m?'on-amber':'on-blue');
+      slot.innerHTML=`
+        <div class="slot-icon">${src.emoji}</div>
+        <div class="slot-name">${src.name}</div>
+        <div class="slot-mw${m?' mys':''}">${m?'??? MW':'+'+src.mw+' MW'}</div>`;
+    } else {
+      slot.className='slot';
+      if (conn) conn.className='conn-line';
+      slot.innerHTML=`<div style="font-size:20px;color:var(--dim)">⚡</div><div class="slot-placeholder">插槽 ${i+1}</div>`;
+    }
+  }
+}
+
+function updateBalance() {
+  const demand = totalDemand();
+  const supply = hasMystery() ? demand : totalSupply();
+  const pct = demand>0 ? Math.min(supply/demand*100,100) : 0;
+  const bar   = document.getElementById('bal-bar');
+  const pctEl = document.getElementById('bal-pct');
+  const stEl  = document.getElementById('bal-status');
+
+  if (selected.length===0) {
+    bar.style.width='0%'; bar.style.background='var(--dim)';
+    pctEl.textContent='—'; pctEl.style.color='var(--dim)';
+    stEl.textContent='請選擇電源'; stEl.style.color='var(--dim)';
+    return;
+  }
+  if (hasMystery()) {
+    bar.style.width='100%'; bar.style.background='var(--green)';
+    pctEl.textContent='100%'; pctEl.style.color='var(--green)';
+    stEl.textContent='供需完美平衡 ✓'; stEl.style.color='var(--green)';
+    return;
+  }
+  bar.style.width=pct+'%';
+  if (pct>=90) {
+    bar.style.background='var(--green)'; pctEl.style.color='var(--green)'; stEl.textContent='接近平衡'; stEl.style.color='var(--green)';
+  } else if (pct>=70) {
+    bar.style.background='var(--amber)'; pctEl.style.color='var(--amber)'; stEl.textContent='供電不足'; stEl.style.color='var(--amber)';
+  } else {
+    bar.style.background='var(--red)'; pctEl.style.color='var(--red)'; stEl.textContent='嚴重缺電'; stEl.style.color='var(--red)';
+  }
+  pctEl.textContent=Math.round(pct)+'%';
+}
+
+function updateConfirmBtn() {
+  const btn=document.getElementById('btn-confirm');
+  if (selected.length===2) btn.classList.add('ready'); else btn.classList.remove('ready');
+}
+
+// ══════════════════════════════
+//  GAME TICK
+// ══════════════════════════════
+function gameTick() {
+  if (!gameActive) return;
+
+  // Grow demand
+  DEMANDS.forEach(d=>{
+    demandNow[d.id] = Math.round(demandNow[d.id]+d.growth);
+    const mwEl=document.getElementById('dmw-'+d.id);
+    if (mwEl) mwEl.textContent=demandNow[d.id];
+    const barEl=document.getElementById('dbar-'+d.id);
+    if (barEl) {
+      const ratio=demandNow[d.id]/(d.base*1.65);
+      barEl.style.width=Math.min(ratio*100,100)+'%';
+    }
+    // Row warning state
+    const row=document.getElementById('drow-'+d.id);
+    if (row) {
+      const ratio=demandNow[d.id]/(d.base*1.2);
+      if (ratio>1.15) { row.className='demand-row crit'; }
+      else if (ratio>1) { row.className='demand-row warn'; }
+    }
+  });
+
+  // Demand rising tick every 5s
+  if (timeLeft%5===0) sndRisingTick();
+
+  // Update balance live
+  if (selected.length>0) updateBalance();
+
+  // Timer
+  timeLeft--;
+  const te=document.getElementById('timer');
+  te.textContent=timeLeft;
+  te.className='timer-val'+(timeLeft<=10?' urgent':'');
+  if (timeLeft<=10 && timeLeft>0 && timeLeft%2===0) sndWarn();
+
+  if (timeLeft<=0) {
+    if (selected.length===2) confirmSelection();
+    else { selected=['solar','wind']; confirmSelection(); }
+  }
+}
+
+// ══════════════════════════════
+//  CONFIRM
+// ══════════════════════════════
+function confirmSelection() {
+  gameActive=false; clearInterval(gameInterval); stopAmbient();
+  if (hasMystery()) {
+    sndSuccess();
+    if (navigator.vibrate) navigator.vibrate([60,60,60,60,300]);
+    const fl=document.getElementById('mys-flash');
+    fl.classList.remove('pop'); void fl.offsetWidth; fl.classList.add('pop');
+    setTimeout(()=>showScreen('s-result-mystery'),500);
+  } else {
+    sndFail();
+    if (navigator.vibrate) navigator.vibrate([300,100,300,100,500]);
+    const demand=totalDemand(), supply=totalSupply();
+    const pct=Math.round(supply/demand*100);
+    document.getElementById('fail-pct').textContent=pct;
+    document.getElementById('fail-pct2').textContent=pct+'%';
+    if (pct<60) {
+      document.getElementById('fail-tag').textContent='供電嚴重不足';
+      document.getElementById('fail-title').textContent='多區大停電';
+      document.getElementById('fail-body').innerHTML=`傳統電源組合只能滿足需求的 <strong>${pct}%</strong>，多個城市陷入停電。`;
+    } else if (pct<78) {
+      document.getElementById('fail-tag').textContent='供電不足';
+      document.getElementById('fail-title').textContent='電網超載';
+      document.getElementById('fail-body').innerHTML=`傳統電源最多只能滿足需求的 <strong>${pct}%</strong>。<br>這不是調度失誤——是既有電源的上限。`;
+    } else {
+      document.getElementById('fail-tag').textContent='勉強維持';
+      document.getElementById('fail-title').textContent='差一點崩潰';
+      document.getElementById('fail-body').innerHTML=`選擇了最強組合，勉強達到 <strong>${pct}%</strong>，<br>但電網已在崩潰邊緣，無法長期支撐。`;
+    }
+    setTimeout(()=>showScreen('s-result-fail'),600);
+  }
+}
+
+// ══════════════════════════════
+//  FLOW
+// ══════════════════════════════
+function startCountdown() {
+  sndClick();
+  showScreen('s-countdown');
+  let n=3;
+  const el=document.getElementById('cd-num');
+  function tick(){
+    el.className='cd-num'; void el.offsetWidth;
+    if(n>0){ el.textContent=n; sndCountdownBeep(false); n--; setTimeout(tick,1000); }
+    else { el.textContent='GO!'; el.className='cd-num go'; sndCountdownBeep(true); setTimeout(beginGame,900); }
+  }
+  tick();
+}
+
+function beginGame() {
+  buildCards(); buildDemand();
+  showScreen('s-game');
+  startAmbient();
+  gameActive=true;
+  gameInterval=setInterval(gameTick,1000);
+}
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+</script>
+</body>
+</html>
