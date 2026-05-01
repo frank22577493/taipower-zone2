@@ -721,9 +721,9 @@ function buildCards() {
     card.id='card-'+src.id;
     card.onclick=function(){ toggleCard(src.id); };
     if (src.isMystery) {
-      card.innerHTML='<div class="card-img-box" style="background:#050505"><img src="遊戲設計/z2_mystery.jpg" alt="神秘來源" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;opacity:0.7" onerror="this.style.display=\'none\'"><span class="card-emoji" style="font-size:42px;color:#1e1e1e">？</span></div><div class="card-info"><div class="card-name" style="color:#2a2a2a">???</div><div class="card-mw" style="color:#222">— MW</div><span class="card-tag tag-mystery">神秘來源</span></div>';
+      card.innerHTML='<div class="card-img-box" style="background:#050505"><img src="遊戲設計/zone2/z2_mystery.jpg" alt="神秘來源" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;opacity:0.7" onerror="this.style.display=\'none\'"><span class="card-emoji" style="font-size:42px;color:#1e1e1e">？</span></div><div class="card-info"><div class="card-name" style="color:#2a2a2a">???</div><div class="card-mw" style="color:#222">— MW</div><span class="card-tag tag-mystery">神秘來源</span></div>';
     } else {
-      card.innerHTML='<div class="card-img-box" style="background:'+src.bg+'"><img src="遊戲設計/z2_'+src.id+'.jpg" alt="'+src.name+'" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;opacity:0.85" onerror="this.style.display=\'none\'"><span class="card-emoji">'+src.emoji+'</span></div><div class="card-info"><div class="card-name">'+src.name+'</div><div class="card-mw">+'+src.mw+' MW</div><span class="card-tag tag-'+src.tc+'">'+src.tag+'</span></div>';
+      card.innerHTML='<div class="card-img-box" style="background:'+src.bg+'"><img src="遊戲設計/zone2/z2_'+src.id+'.jpg" alt="'+src.name+'" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;opacity:0.85" onerror="this.style.display=\'none\'"><span class="card-emoji">'+src.emoji+'</span></div><div class="card-info"><div class="card-name">'+src.name+'</div><div class="card-mw">+'+src.mw+' MW</div><span class="card-tag tag-'+src.tc+'">'+src.tag+'</span></div>';
     }
     grid.appendChild(card);
   });
